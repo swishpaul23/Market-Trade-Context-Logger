@@ -88,60 +88,52 @@ def calculate_performance(entry, exit, position_type):
         print(f"Warning: Unknown direction '{position_type}'. Assuming long.")
         return round((exit - entry) / entry, 4)
 
-def log_trade(date, ticker, entry, exit, direction, journal_file="trading_journal.csv"):
-    """
-     Docstring for log_trade
-     FUNCTION C: THE CONTROLLER (Log & Save)
-    """
-    print(f"\n--- Processing Trade: {ticker} on {date} ---")
-
-    # 1. GENERATE ID
-    # Format: YYYYMMDD_TICKER_DIR (e.g., 20260205_NVDA_LONG)
-    clean_date = date.replace("-", "")
+# --- UPDATE THIS FUNCTION IN backend.py ---
+def log_trade(entry_date, exit_date, ticker, entry, exit, direction, notes, journal_file="trading_journal.csv"):
+    print(f"\n--- Processing Trade: {ticker} ---")
+    
+    # 1. GENERATE ID (Using Entry Date)
+    clean_date = entry_date.replace("-", "")
     trade_id = f"{clean_date}_{ticker.upper()}_{direction.upper()}"
     
-    # 2. GET CONTEXT (Function A)
+    # 2. GET CONTEXT (Always based on ENTRY - The Decision Moment)
     print("Fetching Market Context...")
-    context = get_market_context(date)
+    context = get_market_context(entry_date)
     
     if context is None:
-        print("CRITICAL ERROR: Context is None")
-        return  # <--- STOPS the function here.
+        print("CRITICAL ERROR: Could not fetch market data. Trade NOT saved.")
+        return
 
-    # 3. CALCULATE STATS (Function B)
+    # 3. CALCULATE STATS
     pnl_pct = calculate_performance(entry, exit, direction)
-
-    # 4. BUILD THE ROW
+    
+    # 4. BUILD THE ROW (Added Exit_Date and Notes)
     trade_data = {
         "Trade_ID": trade_id,
-        "Date": date,
+        "Entry_Date": entry_date,
+        "Exit_Date": exit_date,
         "Ticker": ticker.upper(),
         "Direction": direction.upper(),
         "Entry_Price": entry,
         "Exit_Price": exit,
         "PnL_Percent": pnl_pct,
-        # Unpack the context dictionary here
+        "Notes": notes,  # <--- NEW FIELD
         "SPY_Price": context['SPY_Price'],
         "Market_Regime": context['Market_Regime'],
         "VIX": context['VIX'],
         "10Y_Yield": context['10Y_Yield']
     }
     
-    # 5. SAVE TO CSV
+    # 5. SAVE
     df = pd.DataFrame([trade_data])
     
-    # Check if file exists to determine if we need a header
     if not os.path.exists(journal_file):
         df.to_csv(journal_file, index=False)
         print(f"Created new journal: {journal_file}")
     else:
-        # Append mode ('a'), header=False
+        # Check if file has headers, if not (or if columns changed), we might need to handle that
+        # For simplicity, we append. *User might need to delete old CSV if columns mismatch*
         df.to_csv(journal_file, mode='a', header=False, index=False)
         print(f"Trade appended to {journal_file}")
 
     print("Success.")
-    print("-" * 30)
-
-if __name__ == "__main__":
-# You must call the function with a test trade
-    log_trade("2026-02-03", "NVDA", 120.00, 125.00, "Long")
