@@ -1,0 +1,6 @@
+[theme]
+primaryColor = "#A3779D"         # Soft Violet (Focus outlines, buttons)
+backgroundColor = "#2E1A47"      # Midnight Plum (Main background)
+secondaryBackgroundColor = "#4B2C7A" # A mix of Plum/Amethyst for the Sidebar
+textColor = "#E6C7E6"            # Lilac Mist (Main text)
+font = "sans serif"
