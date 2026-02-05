@@ -1,2 +1,1 @@
 Trade_ID,Date,Ticker,Direction,Entry_Price,Exit_Price,PnL_Percent,SPY_Price,Market_Regime,VIX,10Y_Yield
-20260203_NVDA_LONG,2026-02-03,NVDA,LONG,120.0,125.0,0.0417,689.53,Bullish,18.0,4.27
