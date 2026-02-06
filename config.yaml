@@ -1,0 +1,18 @@
+cookie:
+  expiry_days: 30
+  key: random_signature_key
+  name: trade_journal_cookie
+credentials:
+  usernames:
+    admin:
+      name: Admin User
+      password: $2b$12$ogeMvk57sSrffub5FzGS4e0yRBw.Oqmyivt0/M/bT3Sgboln1mJc6
+    guest:
+      name: Guest Trader
+      password: $2b$12$zqPc23wE9jtW7Hef1RPugOtkMDEm./re2n7dTE0n0oHhMJQlGPUfu
+    swishpaul23:
+      name: Stuart Paul
+      password: $2b$12$K/TK18jEGJZVp1Fdb5qb3.7I5xIoMmQiJtoF1roZ54FOE2FL62r9i
+    yogya2005:
+      name: Yogya Agrawal
+      password: $2b$12$Rk659dsbRfpKSHLLOtCn8urwxUuL6iYLgQSVCuTSfpRi/9N6lYum.

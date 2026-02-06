@@ -5,3 +5,4 @@ datetime
 yfinance
 streamlit
 seaborn
+streamlit-authenticator
