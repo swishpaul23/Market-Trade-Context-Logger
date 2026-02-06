@@ -49,18 +49,17 @@ with st.sidebar.form("trade_form"):
     ticker = st.text_input("Ticker Symbol", value="NVDA")
     direction = st.selectbox("Direction", ["Long", "Short"])
     
+    # NEW: Quantity Input
+    shares = st.number_input("Quantity (Shares)", min_value=1, value=10, step=1) # <--- ADDED
+    
     # Date Logic
     st.markdown("### 📅 Timing")
-    
-    # Status Selector
     trade_status = st.radio("Status", ["Closed (Complete)", "Open (Active)"], horizontal=True)
     
     col_d1, col_d2 = st.columns(2)
     with col_d1:
         entry_date = st.date_input("Entry Date")
-    
     with col_d2:
-        # ALWAYS SHOW THE EXIT DATE (No more hiding)
         exit_date = st.date_input("Exit Date", value=entry_date)
 
     # Prices
@@ -69,32 +68,29 @@ with st.sidebar.form("trade_form"):
     with col1:
         entry_price = st.number_input("Entry Price", min_value=0.0, format="%.2f")
     with col2:
-        # ALWAYS SHOW THE EXIT PRICE (No more hiding)
         exit_price = st.number_input("Exit Price", min_value=0.0, format="%.2f")
     
     # Notes
     st.markdown("### 📝 Analysis")
     notes = st.text_area("Conviction / Notes", placeholder="E.g., Bought off the 200SMA support. Market was oversold.")
 
-    # Submit Button
     submit = st.form_submit_button("Log Trade")
 
     if submit:
         e_date_str = entry_date.strftime("%Y-%m-%d")
         
-        # LOGIC: Check the Status Button to decide what to save
         if trade_status == "Closed (Complete)":
             x_date_str = exit_date.strftime("%Y-%m-%d")
             final_exit_price = exit_price
         else:
-            x_date_str = "Active"       # Force "Active" string
-            final_exit_price = 0.0      # Force 0.0 price
+            x_date_str = "Active"
+            final_exit_price = 0.0
             
         with st.spinner("Fetching Market Context..."):
             try:
-                # We pass 'final_exit_price' instead of the raw widget value
-                log_trade(e_date_str, x_date_str, ticker, entry_price, final_exit_price, direction, notes)
-                st.success(f"Trade Logged: {ticker}")
+                # PASS SHARES TO BACKEND
+                log_trade(e_date_str, x_date_str, ticker, entry_price, final_exit_price, shares, direction, notes)
+                st.success(f"Trade Logged: {ticker} ({shares} shares)")
             except Exception as e:
                 st.error(f"Error: {e}")
 
@@ -195,17 +191,14 @@ try:
         # --- DATA TABLE ---
         st.markdown("### 📋 Trade Log")
         
-        # FORMATTING: Make the table look pretty
-        # We create a display copy so we can format numbers as percentages
+        # Format PnL column to show %
         display_df = df.copy()
-        
-        # Format PnL column to show % (e.g., 5.23%)
         display_df['PnL_Percent'] = display_df['PnL_Numeric'].apply(lambda x: f"{x*100:.2f}%")
         
-        # Define Columns
-        display_cols = ["Entry_Date", "Ticker", "Direction", "Entry_Price", "Exit_Price", "PnL_Percent", "Market_Regime", "Notes", "Exit_Date"]
-        final_cols = [c for c in display_cols if c in display_df.columns]
+        # Add 'Quantity' and 'PnL_Dollar' to this list
+        display_cols = ["Entry_Date", "Ticker", "Direction", "Quantity", "Entry_Price", "Exit_Price", "PnL_Percent", "PnL_Dollar", "Market_Regime", "VIX", "10Y_Yield", "Notes", "Exit_Date"]
         
+        final_cols = [c for c in display_cols if c in display_df.columns]
         st.dataframe(display_df[final_cols], use_container_width=True)
 
     # --- 4. ANALYTICS BUTTON (RESTORED) ---

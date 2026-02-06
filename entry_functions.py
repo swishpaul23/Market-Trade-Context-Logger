@@ -89,51 +89,51 @@ def calculate_performance(entry, exit, position_type):
         return round((exit - entry) / entry, 4)
 
 # --- UPDATE THIS FUNCTION IN backend.py ---
-def log_trade(entry_date, exit_date, ticker, entry, exit, direction, notes, journal_file="trading_journal.csv"):
+# --- UPDATE THIS IN backend.py ---
+def log_trade(entry_date, exit_date, ticker, entry, exit, shares, direction, notes, journal_file="trading_journal.csv"):
+    #                                             ^^^^ ADDED THIS ARGUMENT
     print(f"\n--- Processing Trade: {ticker} ---")
     
-    # 1. GENERATE ID (Using Entry Date)
     clean_date = entry_date.replace("-", "")
     trade_id = f"{clean_date}_{ticker.upper()}_{direction.upper()}"
     
-    # 2. GET CONTEXT (Always based on ENTRY - The Decision Moment)
-    print("Fetching Market Context...")
     context = get_market_context(entry_date)
-    
     if context is None:
-        print("CRITICAL ERROR: Could not fetch market data. Trade NOT saved.")
         return
 
-    # 3. CALCULATE STATS
+    # Calculate PnL %
     pnl_pct = calculate_performance(entry, exit, direction)
     
-    # 4. BUILD THE ROW (Added Exit_Date and Notes)
+    # NEW: Calculate Realized Dollar PnL (Only if closed)
+    pnl_dollar = 0.0
+    if exit > 0:
+        if direction.lower() == "long":
+            pnl_dollar = (exit - entry) * shares
+        else:
+            pnl_dollar = (entry - exit) * shares
+
     trade_data = {
         "Trade_ID": trade_id,
         "Entry_Date": entry_date,
         "Exit_Date": exit_date,
         "Ticker": ticker.upper(),
         "Direction": direction.upper(),
+        "Quantity": shares,           # <--- NEW FIELD
         "Entry_Price": entry,
         "Exit_Price": exit,
         "PnL_Percent": pnl_pct,
-        "Notes": notes,  # <--- NEW FIELD
-        "SPY_Price": context['SPY_Price'],
+        "PnL_Dollar": round(pnl_dollar, 2), # <--- NEW FIELD
+        "Notes": notes,
         "Market_Regime": context['Market_Regime'],
         "VIX": context['VIX'],
         "10Y_Yield": context['10Y_Yield']
     }
     
-    # 5. SAVE
     df = pd.DataFrame([trade_data])
     
     if not os.path.exists(journal_file):
         df.to_csv(journal_file, index=False)
-        print(f"Created new journal: {journal_file}")
     else:
-        # Check if file has headers, if not (or if columns changed), we might need to handle that
-        # For simplicity, we append. *User might need to delete old CSV if columns mismatch*
         df.to_csv(journal_file, mode='a', header=False, index=False)
-        print(f"Trade appended to {journal_file}")
 
     print("Success.")
