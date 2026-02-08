@@ -2,6 +2,7 @@ import pandas as pd
 import yfinance as yf
 import os
 from datetime import datetime
+import google.generativeai as genai
 
 # --- HELPER: GET MARKET CONTEXT ---
 def get_market_context(date_str):
@@ -122,3 +123,55 @@ def log_trade(entry_date, exit_date, ticker, entry, exit, shares, direction, not
         print(f"Trade appended to {journal_file}")
 
     print("Success.")
+
+def ask_gemini(df, user_query, api_key):
+    """
+    Sends the user's portfolio stats + their question to Gemini Pro.
+    """
+    if df.empty:
+        return "I need some trade data before I can analyze your performance! Log a trade first."
+
+    # 1. Setup Gemini
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-2.5-flash')
+    except Exception as e:
+        return f"Error connecting to Gemini: {e}"
+
+    # 2. Context Engineering (RAG Lite)
+    # We summarize the data so Gemini knows what it is looking at.
+    
+    # Safe conversion to numeric
+    df['PnL_Numeric'] = pd.to_numeric(df['PnL_Percent'], errors='coerce').fillna(0)
+    
+    total_trades = len(df)
+    win_rate = (len(df[df['PnL_Numeric'] > 0]) / total_trades * 100) if total_trades > 0 else 0
+    avg_pnl = df['PnL_Numeric'].mean() * 100
+    best_trade = df.loc[df['PnL_Numeric'].idxmax()] if not df.empty else None
+    worst_trade = df.loc[df['PnL_Numeric'].idxmin()] if not df.empty else None
+    
+    # Construct the context string
+    context = f"""
+    You are a senior financial analyst explaining a trading portfolio to a beginner.
+    Here is the live data from the user's dashboard:
+    
+    - Total Trades: {total_trades}
+    - Win Rate: {win_rate:.1f}%
+    - Average Return per Trade: {avg_pnl:.2f}%
+    - Best Trade: {best_trade['Ticker']} ({best_trade['PnL_Numeric']*100:.2f}%)
+    - Worst Trade: {worst_trade['Ticker']} ({worst_trade['PnL_Numeric']*100:.2f}%)
+    
+    Recent Trades:
+    {df[['Ticker', 'Direction', 'PnL_Percent', 'Notes']].head(5).to_string(index=False)}
+    
+    User Question: "{user_query}"
+    
+    Answer the user simply and clearly. Do not use complex jargon. If they are losing money, be encouraging but realistic.
+    """
+    
+    # 3. Get Response
+    try:
+        response = model.generate_content(context)
+        return response.text
+    except Exception as e:
+        return f"AI Error: {e}"

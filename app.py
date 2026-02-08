@@ -8,7 +8,7 @@ import yaml
 from yaml.loader import SafeLoader
 import bcrypt
 import os
-from entry_functions import log_trade 
+from entry_functions import log_trade, ask_gemini 
 
 # --- CONFIG & STYLING ---
 st.set_page_config(page_title="MD Journal", layout="wide")
@@ -138,6 +138,9 @@ with st.expander("📘 How to use this Journal (The MD Framework)"):
     """)
 
 # --- 2. SIDEBAR: DATA ENTRY ---
+# --- SIDEBAR: AI SETTINGS ---
+st.sidebar.header("🤖 AI Analyst")
+gemini_key = st.sidebar.text_input("Gemini API Key", type="password", help="Get key from Google AI Studio")
 st.sidebar.header("Log New Trade")
 
 with st.sidebar.form("trade_form"):
@@ -215,14 +218,14 @@ try:
                 if entry_price > 0:
                     if direction == "long":
                         unrealized_pnl = (current_price - entry_price) / entry_price
-                    else: # Short
+                    else: 
                         unrealized_pnl = (entry_price - current_price) / entry_price
                     
                     df.at[index, 'PnL_Percent'] = unrealized_pnl
             except Exception:
                 pass 
 
-    # --- METRICS SECTION ---
+    # --- METRICS SECTION (TOP ROW) ---
     if not df.empty:
         colA, colB, colC = st.columns(3)
         df["PnL_Numeric"] = pd.to_numeric(df["PnL_Percent"], errors='coerce').fillna(0)
@@ -230,35 +233,56 @@ try:
         total_pnl = df["PnL_Numeric"].mean() * 100
         win_rate = len(df[df["PnL_Numeric"] > 0]) / len(df) * 100
         
-        colA.metric("Avg Return (inc. Unrealized)", f"{total_pnl:.2f}%")
+        colA.metric("Avg Return", f"{total_pnl:.2f}%")
         colB.metric("Win Rate", f"{win_rate:.0f}%")
         colC.metric("Total Trades", len(df))
 
-        # --- SEABORN VISUALIZATION ---
         st.markdown("---")
-        st.subheader("📈 Performance Trajectory")
         
-        chart_df = df.sort_values("Entry_Date", ascending=True).copy()
-        chart_df["Cumulative Return"] = chart_df["PnL_Numeric"].cumsum() * 100
-        chart_df["Trade Number"] = range(1, len(chart_df) + 1)
+        # --- SPLIT LAYOUT: AI (Left) vs CHART (Right) ---
+        # We change the ratio to [1, 2] so AI is narrow (1/3) and Chart is wide (2/3)
+        col_ai, col_chart = st.columns([1, 2])
         
-        fig, ax = plt.subplots(figsize=(10, 4))
-        fig.patch.set_facecolor('#2E1A47')
-        ax.set_facecolor('#1F1135')
+        # --- LEFT COLUMN: AI ANALYST ---
+        with col_ai:
+            st.subheader("🤖 AI Analyst")
+            user_question = st.text_input("Ask a question:", placeholder="E.g., What is my best trade?")
+            
+            if st.button("Ask Gemini"):
+                if not gemini_key:
+                    st.error("Enter API Key in Sidebar!")
+                else:
+                    with st.spinner("Thinking..."):
+                        ai_response = ask_gemini(df, user_question, gemini_key)
+                        st.info(f"**Analyst:** {ai_response}")
+            
+            st.caption("💡 The AI analyzes your live P&L and trade history.")
+
+        # --- RIGHT COLUMN: EQUITY CURVE ---
+        with col_chart:
+            st.subheader("📈 Performance Trajectory")
+            
+            chart_df = df.sort_values("Entry_Date", ascending=True).copy()
+            chart_df["Cumulative Return"] = chart_df["PnL_Numeric"].cumsum() * 100
+            chart_df["Trade Number"] = range(1, len(chart_df) + 1)
+            
+            fig, ax = plt.subplots(figsize=(10, 5)) # Made chart slightly taller
+            fig.patch.set_facecolor('#2E1A47')
+            ax.set_facecolor('#1F1135')
+            
+            sns.lineplot(data=chart_df, x="Trade Number", y="Cumulative Return", ax=ax, color="#E6C7E6", linewidth=2.5, marker="o")
+            ax.axhline(0, color="#A3779D", linestyle="--", alpha=0.5)
+            
+            ax.set_xlabel("Trade Count", color="#E6C7E6")
+            ax.set_ylabel("Return %", color="#E6C7E6")
+            ax.tick_params(colors="#E6C7E6")
+            for spine in ax.spines.values():
+                spine.set_edgecolor("#663399")
+            st.pyplot(fig)
         
-        sns.lineplot(data=chart_df, x="Trade Number", y="Cumulative Return", ax=ax, color="#E6C7E6", linewidth=2.5, marker="o")
-        ax.axhline(0, color="#A3779D", linestyle="--", alpha=0.5)
-        
-        ax.set_title("Equity Curve (Real-Time)", color="#E6C7E6")
-        ax.set_xlabel("Trade Count", color="#E6C7E6")
-        ax.set_ylabel("Return %", color="#E6C7E6")
-        ax.tick_params(colors="#E6C7E6")
-        for spine in ax.spines.values():
-            spine.set_edgecolor("#663399")
-        st.pyplot(fig)
-        
-        # --- DATA TABLE ---
-        st.markdown("### 📋 Trade Log")
+        # --- DATA TABLE (BOTTOM ROW) ---
+        st.markdown("---")
+        st.subheader("📋 Trade Log")
         display_df = df.copy()
         display_df['PnL_Percent'] = display_df['PnL_Numeric'].apply(lambda x: f"{x*100:.2f}%")
         
